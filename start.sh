@@ -4,6 +4,8 @@ set -e
 
 mkdir -p /app/ssh
 mkdir -p /app/run
+mkdir -p /app/logs
+chmod -R 777 /app
 
 # Generate SSH host keys under /app
 if [ ! -f /app/ssh/ssh_host_ed25519_key ]; then
