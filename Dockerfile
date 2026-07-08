@@ -25,20 +25,22 @@ RUN apk add --no-cache \
         openssh \
         openssh-server \
         openssh-client \
-        dumb-init \
-    && adduser -D -s /bin/bash gcp \
-    && echo "gcp:changeme" | chpasswd \
-    && mkdir -p /run/sshd \
-    && sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
-    && echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config \
-    && echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config \
-    && echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config \
-    && echo "PermitUserEnvironment yes" >> /etc/ssh/sshd_config \
-    && echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config \
-    && echo "Subsystem sftp /usr/lib/ssh/sftp-server" >> /etc/ssh/sshd_config
+        dumb-init
 
+# Create login user
+RUN adduser -D -h /home/gcp -s /bin/bash gcp \
+    && echo "gcp:changeme" | chpasswd
+
+# Create writable directories
+RUN mkdir -p \
+        /app/ssh \
+        /app/run \
+        /app/logs
+
+# Copy Python packages
 COPY --from=builder /install /usr/local
 
+# Startup script
 COPY start.sh /start.sh
 
 RUN chmod +x /start.sh
