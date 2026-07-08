@@ -1,46 +1,53 @@
 # -----------------------------------------------------------------------------
-# Stage 1 - Build
+# Stage 1 - Builder
 # -----------------------------------------------------------------------------
-FROM python:3.12.7-alpine3.20 AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /build
 
 COPY requirements.txt .
 
 RUN pip install \
-    --no-cache-dir \
-    --prefix=/install \
-    -r requirements.txt
+        --no-cache-dir \
+        --prefix=/install \
+        -r requirements.txt
 
 # -----------------------------------------------------------------------------
 # Stage 2 - Runtime
 # -----------------------------------------------------------------------------
-FROM python:3.12.7-alpine3.20
+FROM python:3.12-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-        bash \
-        shadow \
-        openssh \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         openssh-server \
         openssh-client \
-        dumb-init
+        bash \
+        dumb-init && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create login user
-RUN adduser -D -h /home/gcp -s /bin/bash gcp \
-    && echo "gcp:changeme" | chpasswd
+RUN useradd -m -s /bin/bash gcp && \
+    echo "gcp:changeme" | chpasswd
 
-# Create writable directories
+# Create runtime directories
 RUN mkdir -p \
-        /app/ssh \
-        /app/run \
+        /var/run/sshd \
         /app/logs
 
-# Copy Python packages
+# SSH configuration
+RUN sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    echo "UsePAM no" >> /etc/ssh/sshd_config && \
+    echo "PermitEmptyPasswords no" >> /etc/ssh/sshd_config && \
+    echo "UseDNS no" >> /etc/ssh/sshd_config
+
 COPY --from=builder /install /usr/local
 
-# Startup script
 COPY start.sh /start.sh
 
 RUN chmod +x /start.sh
